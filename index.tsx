@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Camera, Save, ArrowLeft, Upload, Download, ClipboardList, User, Calendar, Hash, FileSpreadsheet, Trash2, LogOut } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -89,6 +89,11 @@ const HomeScreen = ({
   onNavigate: (screen: string) => void;
 }) => {
   const [userInput, setUserInput] = useState(user);
+
+  // Update local input if user prop changes (e.g. loaded from storage)
+  useEffect(() => {
+    setUserInput(user);
+  }, [user]);
 
   const handleSetUser = () => {
     if (userInput.trim()) setUser(userInput.trim());
@@ -220,12 +225,11 @@ const MovementForm = ({
   const [isScanning, setIsScanning] = useState(false);
 
   // Focus quantity input ref
-  const qtyInputRef = React.useRef<HTMLInputElement>(null);
+  const qtyInputRef = useRef<HTMLInputElement>(null);
 
   const handleScanDetected = (code: string) => {
     setReference(code);
     setIsScanning(false);
-    // Beep or visual feedback could be added here
     // Focus quantity field next for speed
     setTimeout(() => {
         qtyInputRef.current?.focus();
@@ -406,11 +410,13 @@ const MovementForm = ({
 const ListScreen = ({ 
   movements, 
   onDelete, 
-  onBack 
+  onBack,
+  onClearAll
 }: { 
   movements: StockRecord[]; 
   onDelete: (id: string) => void; 
-  onBack: () => void; 
+  onBack: () => void;
+  onClearAll: () => void;
 }) => {
   const [activeTab, setActiveTab] = useState<MovementType>('IN');
 
@@ -424,7 +430,16 @@ const ListScreen = ({
     const inList = movements.filter(m => m.type === 'IN');
     const outList = movements.filter(m => m.type === 'OUT');
     const invList = movements.filter(m => m.type === 'INVENTORY');
+    
+    // Generate file
     exportToExcel(inList, outList, invList);
+
+    // Ask to clear data
+    setTimeout(() => {
+        if (window.confirm("Export generated successfully!\n\nDo you want to clear the list now?")) {
+            onClearAll();
+        }
+    }, 500);
   };
 
   return (
@@ -502,7 +517,7 @@ const ListScreen = ({
           className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <FileSpreadsheet className="w-5 h-5" />
-          Export to Excel
+          Export & Clear
         </button>
       </div>
     </div>
@@ -513,8 +528,30 @@ const ListScreen = ({
 
 const App = () => {
   const [currentScreen, setCurrentScreen] = useState('HOME');
-  const [user, setUser] = useState('');
-  const [movements, setMovements] = useState<StockRecord[]>([]);
+  
+  // Initialize state from LocalStorage
+  const [user, setUser] = useState(() => {
+    return localStorage.getItem('stock_user') || '';
+  });
+  
+  const [movements, setMovements] = useState<StockRecord[]>(() => {
+    const saved = localStorage.getItem('stock_movements');
+    try {
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.error("Failed to parse movements", e);
+        return [];
+    }
+  });
+
+  // Save to LocalStorage whenever state changes
+  useEffect(() => {
+    localStorage.setItem('stock_user', user);
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem('stock_movements', JSON.stringify(movements));
+  }, [movements]);
 
   // Simple Router
   const renderScreen = () => {
@@ -558,6 +595,7 @@ const App = () => {
         return <ListScreen 
                   movements={movements} 
                   onDelete={(id) => setMovements(movements.filter(m => m.id !== id))}
+                  onClearAll={() => setMovements([])}
                   onBack={() => setCurrentScreen('HOME')}
                />;
       default:
