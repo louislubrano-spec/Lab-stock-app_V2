@@ -4,11 +4,11 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Le chemin de base relatif est CRUCIAL pour GitHub Pages
+  // 'base: ./' permet à l'app de fonctionner quel que soit le nom du repo GitHub (ex: /Stock-app/ ou /Lab-v2/)
   base: './', 
   build: {
     outDir: 'dist',
-    sourcemap: true, // Aide au debug si nécessaire
+    sourcemap: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
